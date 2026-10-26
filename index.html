@@ -1,0 +1,201 @@
+
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>സുഭാഷ് ചികിത്സാ ഫണ്ട്</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101d32;color:#fff;font-family:Arial,sans-serif}
+.container{max-width:480px;margin:auto;padding:20px 14px 45px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sub{font-size:12px;color:#a9bfd8}
+h2{font-size:21px;margin:8px 0}
+.refresh{border:0;border-radius:14px;background:#304763;color:white;padding:12px;cursor:pointer}
+.hero{background:#203853;border-radius:16px;padding:19px;margin:20px 0 12px}
+.hero h1{font-size:35px;margin:12px 0}
+.line{display:flex;justify-content:space-between;gap:10px}
+.green{color:#70e0b3}
+.orange{color:#ffd08a}
+.track{height:9px;background:#455970;border-radius:9px;overflow:hidden;margin-top:17px}
+#bar{height:100%;background:#58d5a5;width:0}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:22px}
+.card{padding:15px;border-radius:13px;background:#17483d}
+.card.pending{background:#50382b}
+.card b{display:block;font-size:23px;margin:9px 0}
+.card small{color:#d0dfeb;font-size:12px}
+.tabs{display:flex;background:#17243a;border-radius:25px;margin:14px 0}
+.tabs button{flex:1;border:0;background:transparent;color:#c1d0e1;padding:12px 4px;border-radius:25px;cursor:pointer}
+.tabs button.active{background:#304763;color:white;font-weight:bold}
+input{width:100%;border:1px solid #40536b;background:transparent;color:white;border-radius:25px;padding:14px;outline:none;margin-bottom:12px}
+.person{background:#203853;border-radius:14px;padding:13px;margin-bottom:9px;display:flex;align-items:center;gap:10px}
+.avatar{width:37px;height:37px;flex-shrink:0;border-radius:50%;background:#38536f;display:grid;place-items:center;font-weight:bold}
+.details{flex:1;min-width:0}
+.details b{display:block;font-size:14px;overflow-wrap:anywhere}
+.details small{display:block;color:#b7cbe0;font-size:11px;margin-top:5px}
+.amount{text-align:right;font-size:13px;font-weight:bold}
+.amount small{display:block;font-size:10px;color:#b7cbe0;font-weight:normal;margin-top:5px}
+#message{text-align:center;color:#b7cbe0;padding:15px}
+.footer{text-align:center;color:#8eaac7;font-size:11px;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top">
+    <div>
+      <div class="sub">NHSS XH 1998–99</div>
+      <h2>സുഭാഷ് ചികിത്സാ ഫണ്ട്</h2>
+      <div class="sub">Live Collection Dashboard</div>
+    </div>
+    <button class="refresh" onclick="loadData()">↻ Refresh</button>
+  </div>
+
+  <div class="hero">
+    <div class="sub">മൊത്തം വാഗ്ദാനം</div>
+    <h1 id="pledged">₹0</h1>
+    <div class="line">
+      <span class="green" id="receivedLine">Received ₹0</span>
+      <span class="orange" id="percent">0%</span>
+    </div>
+    <div class="track"><div id="bar"></div></div>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <small>Received</small>
+      <b id="received">₹0</b>
+      <small id="paidCount">0 members</small>
+    </div>
+    <div class="card pending">
+      <small>Pending</small>
+      <b id="pending">₹0</b>
+      <small id="pendingCount">0 members</small>
+    </div>
+  </div>
+
+  <div class="line">
+    <b>Contributors</b>
+    <span class="sub" id="count">0 / 0</span>
+  </div>
+
+  <div class="tabs">
+    <button class="active" onclick="changeTab('all',this)">All</button>
+    <button onclick="changeTab('paid',this)">✓ Paid</button>
+    <button onclick="changeTab('pending',this)">Pending</button>
+  </div>
+
+  <input id="search" placeholder="Search contributor..." oninput="render()">
+  <div id="message">Loading contributions...</div>
+  <div id="people"></div>
+  <div class="footer" id="updated"></div>
+</div>
+
+<script>
+let donors = [];
+let tab = 'all';
+const money = n => '₹' + Number(n || 0).toLocaleString('en-IN');
+
+async function loadData(){
+  document.getElementById('message').textContent = 'Loading contributions...';
+  try{
+    const response = await fetch(
+      './subhash-dashboard-data.json?t=' + Date.now(),
+      {cache:'no-store'}
+    );
+    if(!response.ok) throw new Error('Data file not found');
+    const result = await response.json();
+    if(!Array.isArray(result.contributors)) throw new Error('Invalid data');
+    donors = result.contributors;
+    updateSummary();
+    render();
+    document.getElementById('updated').textContent =
+      result.updatedAt ? 'Data updated: ' +
+      new Date(result.updatedAt).toLocaleString('en-IN') : '';
+  }catch(error){
+    document.getElementById('message').textContent =
+      'Unable to load data. Please try Refresh.';
+  }
+}
+
+function updateSummary(){
+  const pledged = donors.reduce((s,d)=>s+Number(d.pledged||0),0);
+  const received = donors.reduce((s,d)=>s+Number(d.received||0),0);
+  const pending = donors.reduce((s,d)=>
+    s+Math.max(0,Number(d.pledged||0)-Number(d.received||0)),0);
+  const paidCount = donors.filter(d=>Number(d.received)>0).length;
+  const pendingCount = donors.filter(d=>
+    Number(d.pledged)>Number(d.received)).length;
+  const percent = pledged ? received/pledged*100 : 0;
+
+  document.getElementById('pledged').textContent=money(pledged);
+  document.getElementById('received').textContent=money(received);
+  document.getElementById('pending').textContent=money(pending);
+  document.getElementById('receivedLine').textContent='Received '+money(received);
+  document.getElementById('percent').textContent=percent.toFixed(1)+'%';
+  document.getElementById('bar').style.width=Math.min(100,percent)+'%';
+  document.getElementById('paidCount').textContent=paidCount+' members';
+  document.getElementById('pendingCount').textContent=pendingCount+' members';
+}
+
+function changeTab(value,button){
+  tab=value;
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('active'));
+  button.classList.add('active');
+  render();
+}
+
+function render(){
+  const search=document.getElementById('search').value.toLowerCase();
+  const filtered=donors.filter(d=>{
+    const pledged=Number(d.pledged||0);
+    const received=Number(d.received||0);
+    return (tab==='all' ||
+      (tab==='paid' && received>0) ||
+      (tab==='pending' && pledged>received)) &&
+      String(d.name).toLowerCase().includes(search);
+  });
+
+  document.getElementById('count').textContent=
+    filtered.length+' / '+donors.length;
+
+  const container=document.getElementById('people');
+  container.replaceChildren();
+
+  filtered.forEach(d=>{
+    const balance=Math.max(0,Number(d.pledged)-Number(d.received));
+    const row=document.createElement('div');
+    row.className='person';
+
+    const avatar=document.createElement('div');
+    avatar.className='avatar';
+    avatar.textContent=String(d.name).charAt(0).toUpperCase();
+
+    const details=document.createElement('div');
+    details.className='details';
+    const name=document.createElement('b');
+    name.textContent=d.name;
+    const pledged=document.createElement('small');
+    pledged.textContent='Pledged '+money(d.pledged);
+    details.append(name,pledged);
+
+    const amount=document.createElement('div');
+    amount.className='amount';
+    amount.style.color=balance?'#ffd08a':'#70e0b3';
+    amount.textContent=balance?money(balance)+' due':'✓ Paid';
+    const received=document.createElement('small');
+    received.textContent=money(d.received)+' received';
+    amount.append(received);
+
+    row.append(avatar,details,amount);
+    container.append(row);
+  });
+
+  document.getElementById('message').textContent=
+    filtered.length?'':'No contributors found';
+}
+
+loadData();
+</script>
+</body>
+</html>
